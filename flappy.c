@@ -19,6 +19,23 @@
 #define MENU_SCREEN 0
 #define PLAY_SCREEN 1
 
+// Pipe stats:
+#define PIPE_START_X 400
+#define PIPE_W 50
+#define PIPE_V -100
+
+/**
+ * Linked list node for a pipe.
+ */
+struct Pipe {
+    // Horizontal position of the pipe:
+    int x;
+    // Center of the opening:
+    int y;
+    // The next pipe in the chain:
+    struct Pipe* next;
+};
+
 /**
  * Draw the bird onto a surface
  * @param surf The surface to draw the bird onto
@@ -36,6 +53,16 @@ void draw_bird(SDL_Surface* surf, int x, int y) {
     SDL_FillRect(surf, &birdrect, SDL_MapRGB(surf->format, 255, 255, 255));
 }
 
+void draw_pipe(SDL_Surface* surf, int x) {
+    SDL_Rect piperect;
+    piperect.w = PIPE_W;
+    piperect.h = WIN_H;
+    piperect.x = x;
+    piperect.y = 0;
+    
+    SDL_FillRect(surf, &piperect, SDL_MapRGB(surf->format, 0, 127, 0));
+}
+
 int main(int argc, char** argv) {
     // Game Setup:
     const int bird_start_x = WIN_W / 4;
@@ -44,6 +71,9 @@ int main(int argc, char** argv) {
     // Start velocity downward, px per frame:
     const double bird_start_v = 0.0;
     double bird_v;
+    
+    // First pipe in the chain each game:
+    struct Pipe first_pipe;
     
     // SDL Setup:
     SDL_Init(SDL_INIT_VIDEO);
@@ -97,6 +127,8 @@ int main(int argc, char** argv) {
             );
             
             if (screen == PLAY_SCREEN) {
+                draw_pipe(surf, first_pipe.x);
+                
                 // Accelerate bird until terminal velocity:
                 bird_v = fmin(BIRD_A + bird_v, MAX_V);
                 bird_y += bird_v;
@@ -105,6 +137,9 @@ int main(int argc, char** argv) {
                 // Reset bird:
                 bird_y = bird_start_y;
                 bird_v = bird_start_v;
+                
+                // Set up pipe chain:
+                first_pipe.x = PIPE_START_X;
             }
         
             // Render the frame:
