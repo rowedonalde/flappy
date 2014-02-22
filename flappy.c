@@ -1,3 +1,6 @@
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
 
 #include <SDL2/SDL.h>
@@ -20,9 +23,15 @@
 #define PLAY_SCREEN 1
 
 // Pipe stats:
+#define GAP_H 150
+#define GAP_TOP_MIN 20
+#define GAP_TOP_MAX 380
 #define PIPE_START_X 400
 #define PIPE_W 50
-#define PIPE_V -100
+// Speed at which a pipe moves left:
+#define PIPE_V -8
+// Distance from the start of one pipe to the start of the next:
+#define PIPE_D 300
 
 /**
  * Linked list node for a pipe.
@@ -30,7 +39,7 @@
 struct Pipe {
     // Horizontal position of the pipe:
     int x;
-    // Center of the opening:
+    // Top of the opening:
     int y;
     // The next pipe in the chain:
     struct Pipe* next;
@@ -53,14 +62,37 @@ void draw_bird(SDL_Surface* surf, int x, int y) {
     SDL_FillRect(surf, &birdrect, SDL_MapRGB(surf->format, 255, 255, 255));
 }
 
-void draw_pipe(SDL_Surface* surf, int x) {
+/**
+ * Draw a pipe onto a surface
+ * @param surf The surface to draw the pipe onto
+ * @param x The left edge of the pipe
+ * @param y The top of the gap in the pipe
+ */
+void draw_pipe(SDL_Surface* surf, int x, int y) {
     SDL_Rect piperect;
+    
+    // Top pipe:
     piperect.w = PIPE_W;
-    piperect.h = WIN_H;
+    piperect.h = y;
     piperect.x = x;
     piperect.y = 0;
     
     SDL_FillRect(surf, &piperect, SDL_MapRGB(surf->format, 0, 127, 0));
+    
+    // Bottom pipe:
+    piperect.y = y + GAP_H;
+    piperect.h = WIN_H - piperect.y;
+    
+    SDL_FillRect(surf, &piperect, SDL_MapRGB(surf->format, 0, 127, 0));
+}
+
+struct Pipe* make_pipe(int x) {
+    struct Pipe* p = malloc(sizeof(struct Pipe));
+    
+    p->x = x;
+    p->y = rand() % (GAP_TOP_MAX - GAP_TOP_MIN) + GAP_TOP_MIN;
+    
+    return p;
 }
 
 int main(int argc, char** argv) {
@@ -73,7 +105,10 @@ int main(int argc, char** argv) {
     double bird_v;
     
     // First pipe in the chain each game:
-    struct Pipe first_pipe;
+    struct Pipe* first_pipe = NULL;
+    
+    // Seed the random number generator:
+    srand((int)clock());
     
     // SDL Setup:
     SDL_Init(SDL_INIT_VIDEO);
@@ -127,7 +162,9 @@ int main(int argc, char** argv) {
             );
             
             if (screen == PLAY_SCREEN) {
-                draw_pipe(surf, first_pipe.x);
+                // Move each pipe along:
+                first_pipe->x += PIPE_V;
+                draw_pipe(surf, first_pipe->x, first_pipe->y);
                 
                 // Accelerate bird until terminal velocity:
                 bird_v = fmin(BIRD_A + bird_v, MAX_V);
@@ -139,7 +176,7 @@ int main(int argc, char** argv) {
                 bird_v = bird_start_v;
                 
                 // Set up pipe chain:
-                first_pipe.x = PIPE_START_X;
+                first_pipe = make_pipe(PIPE_START_X);
             }
         
             // Render the frame:
