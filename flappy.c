@@ -15,8 +15,9 @@
 
 // Bird Stats:
 #define BIRD_A 0.3
+#define BIRD_W 25
 #define CLICK_V -7.0
-#define MAX_V 5.0
+#define MAX_V 10.0
 
 // Game screens:
 #define MENU_SCREEN 0
@@ -54,8 +55,8 @@ struct Pipe {
 void draw_bird(SDL_Surface* surf, int x, int y) {
     // For right now the bird is just a 25x25 square:
     SDL_Rect birdrect;
-    birdrect.w = 25;
-    birdrect.h = 25;
+    birdrect.w = BIRD_W;
+    birdrect.h = BIRD_W;
     birdrect.x = x - (birdrect.w / 2);
     birdrect.y = y - (birdrect.h / 2);
     
@@ -91,8 +92,34 @@ struct Pipe* make_pipe(int x) {
     
     p->x = x;
     p->y = rand() % (GAP_TOP_MAX - GAP_TOP_MIN) + GAP_TOP_MIN;
+    p->next = NULL;
     
     return p;
+}
+
+SDL_bool check_impact(struct Pipe* p, int bird_x, int bird_y) {
+    SDL_Rect birdrect;
+    birdrect.w = BIRD_W;
+    birdrect.h = BIRD_W;
+    birdrect.x = bird_x - (birdrect.w / 2);
+    birdrect.y = bird_y - (birdrect.h / 2);
+    
+    // Top pipe:
+    SDL_Rect piperect;
+    piperect.w = PIPE_W;
+    piperect.h = p->y;
+    piperect.x = p->x;
+    piperect.y = 0;
+    
+    if (SDL_HasIntersection(&birdrect, &piperect)) {
+        return SDL_TRUE;
+    }
+    
+    // Bottom pipe:
+    piperect.y = p->y + GAP_H;
+    piperect.h = WIN_H - piperect.y;
+    
+    return SDL_HasIntersection(&birdrect, &piperect);
 }
 
 int main(int argc, char** argv) {
@@ -103,9 +130,13 @@ int main(int argc, char** argv) {
     // Start velocity downward, px per frame:
     const double bird_start_v = 0.0;
     double bird_v;
+    int score;
+    int is_alive;
     
     // First pipe in the chain each game:
-    struct Pipe* first_pipe = NULL;
+    struct Pipe* first_pipe;
+    // Next pipe the bird needs to cross to score:
+    struct Pipe* next_pipe;
     
     // Seed the random number generator:
     srand((int)clock());
@@ -162,21 +193,51 @@ int main(int argc, char** argv) {
             );
             
             if (screen == PLAY_SCREEN) {
-                // Move each pipe along:
-                first_pipe->x += PIPE_V;
-                draw_pipe(surf, first_pipe->x, first_pipe->y);
-                
                 // Accelerate bird until terminal velocity:
                 bird_v = fmin(BIRD_A + bird_v, MAX_V);
                 bird_y += bird_v;
+                
+                // Move each pipe along:
+                struct Pipe* p = first_pipe;
+                for (p = first_pipe; p != NULL; p = p->next) {
+                    p->x += PIPE_V;
+                    
+                    // Check to see whether the bird has died:
+                    if (check_impact(p, bird_start_x, bird_y)) {
+                        if (is_alive) printf("You died\n");
+                        is_alive = 0;
+                    }
+                    draw_pipe(surf, p->x, p->y);
+                    // If this is the last pipe, draw the next pipe
+                    // if there is room for it on the screen:
+                    if (p->next == NULL && p->x < WIN_W - PIPE_D) {
+                        p->next = make_pipe(p->x + PIPE_D);
+                    }
+                }
+                
                 draw_bird(surf, bird_start_x, bird_y);
+                
+                // See whether the bird has scored:
+                if (is_alive && bird_start_x + BIRD_W >= next_pipe->x) {
+                    score++;
+                    printf("%d\n", score);
+                    // This check is redundant, but safe--depending on
+                    // the defined values, the bird might reach the
+                    // next pipe before its follower is generated as above.
+                    if (next_pipe->next == NULL) {
+                        next_pipe->next = make_pipe(next_pipe->x + PIPE_D);
+                    }
+                    next_pipe = next_pipe->next;
+                }
             } else if (screen == MENU_SCREEN) {
                 // Reset bird:
                 bird_y = bird_start_y;
                 bird_v = bird_start_v;
+                score = 0;
+                is_alive = 1;
                 
                 // Set up pipe chain:
-                first_pipe = make_pipe(PIPE_START_X);
+                next_pipe = first_pipe = make_pipe(PIPE_START_X);
             }
         
             // Render the frame:
