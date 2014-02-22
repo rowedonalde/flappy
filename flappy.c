@@ -218,7 +218,7 @@ int main(int argc, char** argv) {
                 draw_bird(surf, bird_start_x, bird_y);
                 
                 // See whether the bird has scored:
-                if (is_alive && bird_start_x + BIRD_W >= next_pipe->x) {
+                if (is_alive && bird_start_x + BIRD_W / 2 > next_pipe->x) {
                     score++;
                     printf("%d\n", score);
                     // This check is redundant, but safe--depending on
